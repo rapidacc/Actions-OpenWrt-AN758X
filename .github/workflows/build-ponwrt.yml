@@ -24,8 +24,6 @@ env:
   TZ: Asia/Shanghai
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   REPO_BRANCH: ${{ github.event.inputs.branch || 'master' }}
-  # 固定的源码 commit（留空 = 用分支最新提交）
-  SOURCE_COMMIT: ${{ github.event.inputs.commit }}
   SOC: ${{ github.event.inputs.soc || 'an7581' }}
   PROFILE: ${{ github.event.inputs.profile || 'fiberhome_hg5585f-ct' }}
   BUILD_SCOPE: ${{ github.event.inputs.scope || 'firmware' }}
@@ -53,11 +51,6 @@ on:
         options:
           - master
           - pon
-      commit:
-        description: '固定源码 commit（留空=用分支最新；默认 ddbf9c8557 = kernel 6.18.52）'
-        required: false
-        default: 'ddbf9c8557'
-        type: string
       soc:
         description: 'SoC 平台'
         required: true
@@ -248,32 +241,14 @@ jobs:
         run: |
           cd "$BUILD_ROOT"
           df -hT "$PWD"
-          if [ -n "${SOURCE_COMMIT:-}" ]; then
-            echo "Pinned commit: $SOURCE_COMMIT"
-            git init openwrt
-            cd openwrt
-            git remote add origin "$REPO_URL"
-            if git fetch --depth=1 origin "$SOURCE_COMMIT"; then
-              git checkout -q FETCH_HEAD
-            else
-              echo "::warning::浅克隆指定 commit 失败，改用 blobless 全历史"
-              cd ..
-              rm -rf openwrt
-              git clone --filter=blob:none --no-checkout "$REPO_URL" openwrt
-              cd openwrt
-              git checkout -q "$SOURCE_COMMIT"
-            fi
-            cd ..
-          else
-            git clone "$REPO_URL" -b "$REPO_BRANCH" --single-branch --depth=1 openwrt
-          fi
+          git clone "$REPO_URL" -b "$REPO_BRANCH" --single-branch --depth=1 openwrt
           ln -sf "$BUILD_ROOT/openwrt" "$GITHUB_WORKSPACE/openwrt"
+
           # 输入项为空时回退到 workflow 级默认值，确保 diy-part2.sh 拿到的
           # 始终是确定值，而不是空串（空串会让 LuCI 概览页显示 "·  ·"）。
           echo "FW_AUTHOR=${FW_AUTHOR:-qwe}" >> "$GITHUB_ENV"
 
           cd openwrt && echo "commit: $(git rev-parse --short HEAD)"
-          echo "kernel : $(sed -n 's/^LINUX_VERSION-6.18 = /6.18/p' target/linux/generic/kernel-6.18)"
       # =========================================================
       # 2.5 内核 config 注入（平台无关符号 + SoC 特定块）
       # 平台无关：TCP_CONG_BBR1（net/ipv4，generic 层，对所有 SoC 生效）
