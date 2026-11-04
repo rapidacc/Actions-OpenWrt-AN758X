@@ -50,6 +50,7 @@ on:
         type: choice
         options:
           - master
+          - my-main
           - pon
           - 1020
       soc:
