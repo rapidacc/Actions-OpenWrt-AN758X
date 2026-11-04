@@ -43,6 +43,7 @@ on:
         options:
           - fork
           - pbs05/ponwrt
+          - rapidacc/ponwrt
       branch:
         description: 'ponwrt 源码分支'
         required: true
@@ -51,6 +52,7 @@ on:
         options:
           - master
           - pon
+          - 1020
       soc:
         description: 'SoC 平台'
         required: true
