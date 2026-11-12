@@ -305,3 +305,35 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
 fi
 
 log "🎉 diy-part1.sh 执行完毕"
+
+# === NPU 中文补丁 ===
+# =====================================================================
+# 中文界面补丁（追加到 diy-part1.sh 末尾）
+# 作用：1) 给 luci-app-airoha-npu 装上简体中文翻译
+#       2) 把菜单标题 "SoC Status" 改成中文
+# =====================================================================
+
+I18N_PO="${GITHUB_WORKSPACE:-$(pwd)}/luci-po/zh_Hans"
+
+# ---------- luci-app-airoha-npu ----------
+NPU_APP="$(pwd)/package/custom/luci-app-airoha-npu"
+if [ -d "$NPU_APP" ]; then
+  if [ -f "$I18N_PO/airoha-npu.po" ]; then
+    mkdir -p "$NPU_APP/po/zh_Hans"
+    cp -f "$I18N_PO/airoha-npu.po" "$NPU_APP/po/zh_Hans/airoha-npu.po"
+    log "airoha-npu 中文 po 已放入"
+  else
+    log "WARN: 未找到 $I18N_PO/airoha-npu.po"
+  fi
+
+  # 菜单标题在 JSON 里硬编码，po 管不到，直接改
+  if grep -rql "SoC Status" "$NPU_APP" 2>/dev/null; then
+    grep -rl "SoC Status" "$NPU_APP" 2>/dev/null | while IFS= read -r f; do
+      sed -i 's/"SoC Status"/"SoC 状态"/g; s/>SoC Status</>SoC 状态</g' "$f"
+    done
+    log "airoha-npu 菜单标题已汉化"
+  fi
+else
+  log "WARN: 未找到 $NPU_APP（确认 ADD_AIROHA_NPU=true）"
+fi
+

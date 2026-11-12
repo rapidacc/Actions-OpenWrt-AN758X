@@ -282,6 +282,7 @@ jobs:
             CRYPTO_HW CRYPTO_DEV_EIP93 \
             CRYPTO_DEV_EIP93_AES_128_SW_MAX_LEN CRYPTO_DEV_EIP93_GENERIC_SW_MAX_LEN \
             CRYPTO_USER_API_AEAD CRYPTO_USER_API_HASH CRYPTO_USER_API_SKCIPHER \
+            NET_AIROHA_FLOW_STATS \
             TCP_CONG_BBR1; do
             sed -i -e "/^CONFIG_${key}=/d" -e "/^# CONFIG_${key} is not set$/d" "$KCONF"
           done
@@ -290,6 +291,7 @@ jobs:
             an7583)
               cat >> "$KCONF" <<'EOF'
           CONFIG_CRYPTO_AES_ARM64=y
+          CONFIG_NET_AIROHA_FLOW_STATS=y
           CONFIG_CRYPTO_AES_ARM64_BS=y
           CONFIG_CRYPTO_AES_ARM64_CE=y
           CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
