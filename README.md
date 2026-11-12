@@ -12,21 +12,15 @@
 | AN7581 | `fiberhome_hg5382a` `fiberhome_hg5585f-ct` `fiberhome_hg5585f-cu` `gemtek_xg2010g` `nokia_xg-040g-md-ubi` `nokia_xg-040g-tf-ubi` `unionman_ung00a` `znxt_zn504xg-d` `znxt_zn515xg-d` |
 | AN7583 | `nokia_xg-040g-mf` `nokia_xg-040g-mf-ubi` |
 
-## Release 4 个变体
+## Release 4 个变体(强烈推荐 openclash和honk，openclash最简单好用，honk需要折腾一下)
 
-- openclash版
-- dae版
-- honk版
+- openclash版 https://github.com/vernesong/OpenClash
+- dae版 https://github.com/daeuniverse/dae
+- honk版 采用404大佬的库 感谢大佬 https://github.com/QiuSimons/luci-app-honk
 - 啥都不带版
 
-注意，dae/honk版如果不带geoip.dat 和 geosite.dat数据的话（看启动log），请自行下到目录下：  
-geoip.dat 和 geosite.dat 严格使用以下顺序中第一个已存在的普通文件：  
-$DAE_LOCATION_ASSET/<name> <BR>
-  <data_dir>/<name> <BR>
-  /var/share/honk/<name>（LEGACY_DATA_DIR）<BR>
-  进程工作目录中的 ./<name> <BR>
-  /usr/local/share/honk/<name>，然后 /usr/share/honk/<name> <BR>
-  /usr/local/share/dae/<name>、/usr/share/dae/<name>，然后 /etc/dae/<name>
+注意，本hub编译的404大佬的honk自带v2ray的geoip/site库（/user/share/v2ray/），在honk启动时候加入变量引入使用。
+
 
 ### AN7583 带硬解AES功能，AN7581带软解
 

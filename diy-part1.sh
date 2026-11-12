@@ -199,21 +199,42 @@ log "  ✅ 必装插件全部就绪: ${CRITICAL_PKGS[*]}"
 endgroup
 
 # ================================================================
-# 覆盖 feeds/luci 中自带的 dae / honk /openclash
+# 覆盖 feeds/luci 中自带的 dae / honk 
 # ================================================================
-group "覆盖 feeds/luci 中的 dae / openclash，并将 honk 放入 package/custom"
+group "覆盖 feeds/luci 中的 dae / honk，并将 honk 放入 package/custom"
 
 rm -rf feeds/luci/applications/luci-app-dae
 rm -rf feeds/luci/applications/luci-app-openclash
 rm -rf feeds/luci/applications/luci-app-honk
 
 clone https://github.com/QiuSimons/luci-app-dae    feeds/luci/applications/luci-app-dae
-clone https://github.com/vernesong/OpenClash  feeds/luci/applications/luci-app-openclash
 # honk 是容器仓库，含 honk + luci-app-honk 两个包，必须放到 package/custom 下
 #clone https://github.com/kenzok8/openwrt-honk.git  feeds/luci/applications/luci-app-honk  "" --depth=1
-clone https://github.com/kenzok8/openwrt-honk.git  "$PKG_DIR/honk"  "" --depth=1
+#clone https://github.com/kenzok8/openwrt-honk.git  "$PKG_DIR/honk"  "" --depth=1
 #clone https://github.com/QiuSimons/luci-app-honk.git  feeds/luci/applications/luci-app-honk  "" --depth=1
-#clone https://github.com/QiuSimons/luci-app-honk.git  "$PKG_DIR/honk"  "" --depth=1
+clone https://github.com/QiuSimons/luci-app-honk.git  "$PKG_DIR/honk"  "" --depth=1
+# ------------------------------------------------------------------
+# 预放 honk-core.bin：--if-needed 检测到无 stamp 的产物会直接复用，
+# 跳过 zig/bpf-linker/cargo 工具链校验和源码编译
+# ------------------------------------------------------------------
+HONK_DIR="$PKG_DIR/honk/honk"
+HONK_OUT="$HONK_DIR/files/honk-core.bin"
+if [ -s "$HONK_OUT" ]; then
+    log " ↷ honk-core.bin 已存在，跳过预放"
+else
+    group "预放 honk-core.bin（免 zig 工具链）"
+    curl -fsSL --retry 3 -o /tmp/honk-core.tar.gz \
+      "https://github.com/daeuniverse/honk/releases/download/v0.1.0-beta.2/honk-core-v0.1.0-beta.2-aarch64-unknown-linux-musl-stock-native-api.tar.gz"
+    echo "bef60542db1d29fa87ad3b5300d0960a1bd173b7ba1121b423b27985a202eb2c  /tmp/honk-core.tar.gz" | sha256sum -c -
+    rm -rf /tmp/honkpkg && mkdir -p /tmp/honkpkg
+    tar -xzf /tmp/honk-core.tar.gz -C /tmp/honkpkg
+    core="$(find /tmp/honkpkg -type f -name honk-core -print -quit)"
+    [ -n "$core" ] || die "tarball 内未找到 honk-core，release 结构可能已变"
+    mkdir -p "$HONK_DIR/files"
+    cp "$core" "$HONK_OUT"
+    log " ✅ 已预放 honk-core.bin ($(du -h "$HONK_OUT" | cut -f1))"
+    endgroup
+fi
 # ------------------------------------------------------------------
 # honk 仓库的 Makefile 把 PKG_HASH 写成大写 SKIP 占位，
 # OpenWrt scripts/download.pl 只识别小写 skip 跳过校验；
@@ -235,61 +256,37 @@ if [ -d "$PKG_DIR/honk" ]; then
   log "  ✅ honk Makefile 哈希占位修正: ${honk_patched} 处"
 fi
 
-# ------------------------------------------------------------------
-# 剔除 dae / honk Makefile 中的 +v2ray-geoip / +v2ray-geosite 依赖，
-# 避免连带编译安装 v2ray 数据包。
-# geo 路由所需 dat 文件改由运行时提供（v2ray-geodata 包或手动放置）。
-# https://github.com/daeuniverse/honk/blob/main/doc/zh/reference/global.md
-# <data_dir>/<name>
-# /usr/local/share/honk/ 
-#/usr/local/share/dae/
-# ------------------------------------------------------------------
-strip_v2ray_geodeps() {
-    local repo="$1" label="$2" hit=0
-    [ -d "$repo" ] || { log " ⚠ $repo 不存在，跳过: $label"; return 0; }
-    while IFS= read -r -d '' mk; do
-        grep -qE '\+v2ray-(geoip|geosite)' "$mk" || continue
-        sed -i -E \
-            -e 's/[[:space:]]*\+v2ray-geoip//g' \
-            -e 's/[[:space:]]*\+v2ray-geosite//g' \
-            -e '/^[[:space:]]*\\[[:space:]]*$/d' \
-            "$mk"
-        log " ✂ $label：已剔除 $(basename "$(dirname "$mk")")/Makefile 的 v2ray-geoip/v2ray-geosite 依赖"
-        hit=$((hit + 1))
-    done < <(find "$repo" -type f -name Makefile -print0)
-    (( hit > 0 )) || log " ⊘ $label：未发现 v2ray-geoip/v2ray-geosite 依赖"
-}
-
-strip_v2ray_geodeps "feeds/luci/applications/luci-app-dae" "luci-app-dae"
-strip_v2ray_geodeps "$PKG_DIR/honk"                        "luci-app-honk"
-
 # 一行搞定如下
-sed -i -E -e 's/[[:space:]]*\+v2ray-(geoip|geosite)//g' \
-          -e '/^[[:space:]]*\\[[:space:]]*$/d' \
-          feeds/luci/applications/luci-app-dae/dae/Makefile \
-          "$PKG_DIR/honk/honk/Makefile"
+#sed -i -E -e 's/[[:space:]]*\+v2ray-(geoip|geosite)//g' \
+#          -e '/^[[:space:]]*\\[[:space:]]*$/d' \
+#          feeds/luci/applications/luci-app-dae/dae/Makefile \
+#          "$PKG_DIR/honk/honk/Makefile"
 
 endgroup
 
-group "honk 下载源预检（staging 资产存在性）"
-if [ -d "$PKG_DIR/honk/honk" ]; then
-    HONK_BASE="https://github.com/kenzok8/openwrt-honk/releases/download/staging"
-    commit=$(sed -n 's/^CORE_COMMIT:=//p' "$PKG_DIR/honk/honk/Makefile")
-    for a in "honk-core-${commit}-x86_64.tar.gz" \
-             "honk-core-${commit}-aarch64.tar.gz" \
-             "honk-core-${commit}-armv7.tar.gz"; do
-        if curl -fsIL "$HONK_BASE/$a" >/dev/null; then
-            log " ✅ staging 存在: $a"
-        else
-            echo "::warning::staging 缺少 $a，固件编译时 honk 包会 404，需固定到 source-* tag"
-        fi
-    done
-    doona=$(sed -n 's/^PKG_SOURCE:=//p' "$PKG_DIR/honk/luci-app-honk/Makefile")
-    curl -fsIL "$HONK_BASE/$doona" >/dev/null || \
-        echo "::warning::staging 缺少 $doona"
-fi
-endgroup
+#group "honk 下载源预检（staging 资产存在性）"
+#if [ -d "$PKG_DIR/honk/honk" ]; then
+#    HONK_BASE="https://github.com/kenzok8/openwrt-honk/releases/download/staging"
+#    commit=$(sed -n 's/^CORE_COMMIT:=//p' "$PKG_DIR/honk/honk/Makefile")
+#    for a in "honk-core-${commit}-x86_64.tar.gz" \
+#             "honk-core-${commit}-aarch64.tar.gz" \
+#             "honk-core-${commit}-armv7.tar.gz"; do
+#        if curl -fsIL "$HONK_BASE/$a" >/dev/null; then
+#            log " ✅ staging 存在: $a"
+#        else
+#            echo "::warning::staging 缺少 $a，固件编译时 honk 包会 404，需固定到 source-* tag"
+#        fi
+#    done
+#    doona=$(sed -n 's/^PKG_SOURCE:=//p' "$PKG_DIR/honk/luci-app-honk/Makefile")
+#    curl -fsIL "$HONK_BASE/$doona" >/dev/null || \
+#        echo "::warning::staging 缺少 $doona"
+#fi
+#endgroup
 
+# OpenClash update to new version
+rm -rf feeds/luci/applications/luci-app-openclash
+#git clone --depth=1 -b dev https://github.com/vernesong/OpenClash.git package/custom/openclash
+git clone --depth=1 -b dev https://github.com/vernesong/OpenClash.git feeds/luci/applications/luci-app-openclash
 
 # ================================================================
 # 输出 GitHub Step Summary，Actions 页面直接看结果
